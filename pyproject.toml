@@ -1,0 +1,53 @@
+[project]
+name = "svara-ai"
+version = "0.1.0"
+description = "Svara.ai - open-source AI voice agent that places real WhatsApp voice calls and holds a natural spoken conversation (NVIDIA Riva/Nemotron or Gemini Live)"
+license = "MIT"
+license-files = ["LICENSE"]
+readme = "README.md"
+keywords = ["ai-voice-agent", "whatsapp", "voice-ai", "speech-to-speech", "realtime-voice", "asr", "tts", "nvidia-riva", "nemotron", "gemini-live", "hindi", "telephony", "conversational-ai"]
+authors = [
+    { email = "namanchitkara2@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiortc>=1.15.0",
+    "apscheduler>=3.11,<4",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "mcp>=2.2.0",
+    "numpy>=2.5.3",
+    "nvidia-riva-client>=2.21.1",
+    "openai>=3.17.0",
+    "python-dotenv>=1.2.3",
+    "pyyaml>=6.0.3",
+    "segno>=1.6.6",
+    "soxr>=1.1.0",
+    "sqlalchemy>=2.0.54",
+    "uvicorn>=0.53.0",
+    "websockets>=17.1",
+]
+
+[project.scripts]
+svara = "apps.cli:main"
+svara-mcp = "apps.mcp_server:main"
+# kept so existing installs, LaunchAgents and docs keep working
+wake-agent = "apps.cli:main"
+wake-agent-mcp = "apps.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps", "services", "agents"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]

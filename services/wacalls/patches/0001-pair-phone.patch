@@ -1,0 +1,124 @@
+diff --git a/internal/app/handlers_session.go b/internal/app/handlers_session.go
+index 27fa148..0e21b43 100644
+--- a/internal/app/handlers_session.go
++++ b/internal/app/handlers_session.go
+@@ -51,6 +51,24 @@ func (s *Server) handleSessionPair(w http.ResponseWriter, r *http.Request) {
+ 	w.WriteHeader(http.StatusNoContent)
+ }
+ 
++// handleSessionPairPhone returns an 8-character linking code for phone-number pairing.
++// Added by wake-agent (services/wacalls/patches/0001-pair-phone.patch).
++func (s *Server) handleSessionPairPhone(w http.ResponseWriter, r *http.Request) {
++	var body struct {
++		Phone string `json:"phone"`
++	}
++	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Phone) == "" {
++		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "phone required"})
++		return
++	}
++	code, err := s.sessions.PairPhone(r.Context(), r.PathValue("sid"), normalizePhone(body.Phone))
++	if err != nil {
++		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
++		return
++	}
++	writeJSON(w, http.StatusOK, map[string]string{"code": code})
++}
++
+ func (s *Server) handleSessionRename(w http.ResponseWriter, r *http.Request) {
+ 	var body struct {
+ 		Name string `json:"name"`
+diff --git a/internal/app/openapi.yaml b/internal/app/openapi.yaml
+index b85ab3f..582bf15 100644
+--- a/internal/app/openapi.yaml
++++ b/internal/app/openapi.yaml
+@@ -151,6 +151,36 @@ paths:
+         "400": { $ref: "#/components/responses/BadRequest" }
+         "401": { $ref: "#/components/responses/Unauthorized" }
+         "429": { $ref: "#/components/responses/RateLimited" }
++  /api/sessions/{sid}/pair-phone:
++    post:
++      operationId: pairSessionPhone
++      summary: Pair by phone number; returns an 8-character linking code
++      parameters:
++        - $ref: "#/components/parameters/Sid"
++      requestBody:
++        required: true
++        content:
++          application/json:
++            schema:
++              type: object
++              required: [phone]
++              properties:
++                phone:
++                  type: string
++      responses:
++        "200":
++          description: Linking code to enter on the phone
++          content:
++            application/json:
++              schema:
++                type: object
++                required: [code]
++                properties:
++                  code:
++                    type: string
++        "400": { $ref: "#/components/responses/BadRequest" }
++        "401": { $ref: "#/components/responses/Unauthorized" }
++        "429": { $ref: "#/components/responses/RateLimited" }
+   /api/sessions/{sid}/calls:
+     post:
+       operationId: startCall
+diff --git a/internal/app/routes.go b/internal/app/routes.go
+index f671729..439f529 100644
+--- a/internal/app/routes.go
++++ b/internal/app/routes.go
+@@ -21,6 +21,7 @@ var apiRoutes = []struct {
+ 	{"PATCH", "/sessions/{sid}", (*Server).handleSessionRename},
+ 	{"POST", "/sessions/{sid}/logout", (*Server).handleSessionLogout},
+ 	{"POST", "/sessions/{sid}/pair", (*Server).handleSessionPair},
++	{"POST", "/sessions/{sid}/pair-phone", (*Server).handleSessionPairPhone},
+ 	{"POST", "/sessions/{sid}/calls", (*Server).handleStartCall},
+ 	{"GET", "/sessions/{sid}/calls", (*Server).handleCallList},
+ 	{"GET", "/sessions/{sid}/calls/{id}", (*Server).handleCallGet},
+diff --git a/internal/app/session/pairphone.go b/internal/app/session/pairphone.go
+new file mode 100644
+index 0000000..aeac341
+--- /dev/null
++++ b/internal/app/session/pairphone.go
+@@ -0,0 +1,36 @@
++package session
++
++import (
++	"context"
++	"fmt"
++	"time"
++
++	"go.mau.fi/whatsmeow"
++)
++
++// PairPhone links a session by phone number instead of QR: it starts a fresh pairing
++// (same as Pair), waits for the login websocket to be up, then asks WhatsApp for an
++// 8-character linking code. The user enters it on the phone under
++// Linked devices > Link with phone number instead. Completion arrives through the same
++// QR-channel "success" event, so the session flips to paired exactly as with a QR scan.
++// Added by wake-agent (services/wacalls/patches/0001-pair-phone.patch).
++func (m *Manager) PairPhone(ctx context.Context, id, phone string) (string, error) {
++	if err := m.Pair(id); err != nil {
++		return "", err
++	}
++	s, ok := m.Get(id)
++	if !ok {
++		return "", fmt.Errorf("no session %s", id)
++	}
++	deadline := time.Now().Add(15 * time.Second)
++	for time.Now().Before(deadline) {
++		s.mu.Lock()
++		state := s.auth.State
++		s.mu.Unlock()
++		if state == "qr" {
++			break
++		}
++		time.Sleep(200 * time.Millisecond)
++	}
++	return s.client.PairPhone(ctx, phone, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
++}

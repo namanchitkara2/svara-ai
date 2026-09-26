@@ -1,0 +1,38 @@
+# Copy to config/wake.yaml (gitignored) and edit. wake.yaml holds real phone numbers; never commit it.
+caller_name: Sam
+contact:
+  name: Asha
+  phone: '+919999999999'
+  timezone: Asia/Kolkata
+schedule:
+  enabled: false   # turn on with: wake-agent schedule --time 08:00
+  time: '08:00'
+  timezone: Asia/Kolkata
+  days: []
+objective: Wake them up and keep talking until they genuinely confirm that they are awake.
+personality: Affectionate, playful, slightly annoying, natural and conversational.
+opening_line: Good morning Asha! I'm Sam's AI assistant. Time to wake up, it's 8 AM.
+disclose_ai: true
+maximum_call_duration_minutes: 15
+verification:
+  min_user_turns: 3
+  silence_nudge_seconds: 12
+retry:
+  enabled: true
+  max_attempts: 3
+  delay_seconds: 300
+voice:
+  provider: nvidia
+  llm_model: nvidia/nemotron-3-super-120b-a12b
+  llm_fallback_models: []
+  tts_voice: Magpie-Multilingual.EN-US.Aria
+  language_code: en-US
+  # how names are SPOKEN (text shown/logged is unchanged)
+  pronunciations:
+    Asha: Aasha              # a name the TTS mispronounces
+    ACME-OS: A C M E O S     # an acronym that must be spelled out
+    MCP: M C P
+    ICP: I C P
+privacy:
+  store_raw_audio: false
+  store_transcript: false

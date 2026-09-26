@@ -1,0 +1,31 @@
+# Unattended deployment (Linux VPS, or Docker Desktop). Nothing is published to the network:
+# wake-agent shares wacalls' network namespace, so the WhatsApp API and the WebRTC audio leg
+# are pure loopback, exactly like the macOS LaunchAgent setup.
+#
+#   cp .env.example .env && cp config/wake.example.yaml config/wake.yaml   # then edit both
+#   docker compose up -d --build
+#   docker compose exec wake-agent uv run wake-agent pair                 # link WhatsApp once
+services:
+  wacalls:
+    build: ./services/wacalls
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - wacalls-data:/data
+
+  wake-agent:
+    build: .
+    restart: unless-stopped
+    network_mode: "service:wacalls"
+    depends_on: [wacalls]
+    env_file: .env
+    environment:
+      WACALLS_URL: http://127.0.0.1:8787
+      WAKE_API_HOST: 127.0.0.1
+    volumes:
+      - wake-data:/data
+      - ./config:/app/config
+
+volumes:
+  wacalls-data:
+  wake-data:
